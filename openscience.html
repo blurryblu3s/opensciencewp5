@@ -31,6 +31,15 @@
             height: 14px;
             transform: rotate(45deg);
             margin-top: 3px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        /* Pulse effect for active but incomplete milestones */
+        .milestone-pulse {
+            animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse-ring {
+            0%, 100% { opacity: 1; transform: rotate(45deg) scale(1); }
+            50% { opacity: 0.8; transform: rotate(45deg) scale(1.15); }
         }
     </style>
 </head>
@@ -46,7 +55,7 @@
         </div>
         <div>
             <h1 class="text-xl font-bold tracking-tight">University Open Science Strategy</h1>
-            <p class="text-xs text-slate-400">Master Gantt Scheduler & Regulatory Tracker (2026 - 2027)</p>
+            <p class="text-xs text-slate-400">Master Gantt Planner with Traceable Milestones &amp; Sub-Task Checklists</p>
         </div>
     </div>
     
@@ -86,7 +95,7 @@
                 </div>
                 <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
                     <span class="text-xs text-slate-500 block">Milestones Reached</span>
-                    <span id="stat-milestones" class="text-xl font-bold text-blue-600">3/12</span>
+                    <span id="stat-milestones" class="text-xl font-bold text-emerald-600">3/12</span>
                 </div>
             </div>
 
@@ -110,10 +119,10 @@
         <!-- System Guidelines Brief -->
         <div class="border-t border-slate-200 pt-4 text-xs text-slate-500">
             <span class="font-semibold text-slate-700 block mb-1">Interactive Gantt Manual:</span>
-            <ul class="list-disc pl-4 space-y-1">
-                <li>Expand/collapse streams using folder toggles.</li>
-                <li>Click any task row to open the editor.</li>
-                <li>Update dates and progress to see real-time updates.</li>
+            <ul class="list-disc pl-4 space-y-1.5">
+                <li><span class="font-medium text-emerald-600">Green Milestones:</span> Instantly highlights fully achieved steps.</li>
+                <li><span class="font-medium text-slate-700">Checkbox items:</span> Updates task percentages automatically based on completed task items.</li>
+                <li>Click any row to open the checklist &amp; date editor.</li>
             </ul>
         </div>
     </aside>
@@ -141,6 +150,9 @@
                 <span class="flex items-center gap-1.5">
                     <span class="w-2.5 h-2.5 bg-purple-500 rounded-sm inline-block"></span> Rewards
                 </span>
+                <span class="flex items-center gap-1.5">
+                    <span class="w-2.5 h-2.5 bg-emerald-600 rounded-sm inline-block"></span> Completed Milestone
+                </span>
             </div>
         </div>
 
@@ -148,13 +160,13 @@
         <div class="flex-grow flex overflow-hidden">
             
             <!-- Left Pane: Hierarchical Task spreadsheet -->
-            <div class="w-[340px] md:w-[420px] shrink-0 border-r border-slate-200 flex flex-col overflow-y-auto select-none bg-white">
+            <div class="w-[360px] md:w-[440px] shrink-0 border-r border-slate-200 flex flex-col overflow-y-auto select-none bg-white">
                 <!-- Header row -->
                 <div class="flex border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 sticky top-0 uppercase tracking-wider z-10">
                     <div class="w-10 p-3 text-center shrink-0 border-r border-slate-200">ID</div>
                     <div class="flex-grow p-3 border-r border-slate-200">Task / Deliverable Name</div>
                     <div class="w-20 p-3 text-center shrink-0 border-r border-slate-200">Start</div>
-                    <div class="w-20 p-3 text-center shrink-0">Progress</div>
+                    <div class="w-24 p-3 text-center shrink-0">Progress</div>
                 </div>
                 
                 <!-- Task List container -->
@@ -223,14 +235,51 @@
                 </div>
             </div>
 
-            <div>
+            <!-- Milestone Completion Quick Button Panel -->
+            <div id="milestone-status-block" class="hidden p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="block text-xs font-semibold text-emerald-800 uppercase">Milestone Status</span>
+                        <span id="milestone-status-text" class="text-xs text-emerald-600">Pending Achievement</span>
+                    </div>
+                    <button id="toggle-milestone-complete-btn" onclick="toggleMilestoneAchievement()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg text-xs transition">
+                        Mark Complete
+                    </button>
+                </div>
+            </div>
+
+            <!-- Task Progress / Checklist Selection -->
+            <div id="standard-progress-block">
                 <div class="flex justify-between items-center mb-1">
                     <label class="block text-xs font-semibold text-slate-500 uppercase">Progress Completion</label>
                     <span id="edit-progress-display" class="text-sm font-bold text-blue-600">60%</span>
                 </div>
-                <input type="range" id="edit-progress" min="0" max="100" class="w-full accent-blue-600" oninput="document.getElementById('edit-progress-display').textContent = this.value + '%'">
+                <input type="range" id="edit-progress" min="0" max="100" class="w-full accent-blue-600 mb-2" oninput="updateSliderProgress(this.value)">
+                <p id="progress-auto-calc-notice" class="text-[10px] text-slate-400 hidden">
+                    *Progress is auto-calculated based on checklist to-dos. Move slider to override manually.
+                </p>
             </div>
 
+            <!-- Interactive Sub-Task Checklist (To-Do List) Section -->
+            <div id="todo-checklist-section" class="border-t border-slate-100 pt-4">
+                <div class="flex justify-between items-center mb-2">
+                    <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Sub-Task Checklist</h4>
+                    <span id="todo-completion-ratio" class="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full font-semibold">0/0 Complete</span>
+                </div>
+                
+                <!-- Add To-Do Input -->
+                <div class="flex gap-2 mb-3">
+                    <input type="text" id="new-todo-text" placeholder="Add a pending action..." class="flex-grow border border-slate-300 rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-blue-500">
+                    <button onclick="addTodoItem()" class="bg-slate-900 hover:bg-slate-850 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition shrink-0">Add</button>
+                </div>
+
+                <!-- To-Do Items List -->
+                <div id="todo-items-list" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    <!-- Dynamic Checklist items go here -->
+                </div>
+            </div>
+
+            <!-- Google Drive Compliance Block -->
             <div id="drive-integration-block" class="hidden p-4 bg-orange-50 border border-orange-200 rounded-xl">
                 <div class="flex items-start gap-3">
                     <input type="checkbox" id="edit-drive-uploaded" class="w-4 h-4 text-orange-600 border-slate-300 rounded focus:ring-orange-500 mt-1" onchange="toggleDriveComplete(this.checked)">
@@ -260,48 +309,92 @@
 </div>
 
 <script>
-    // System Data State representing Open Science deliverables & tasks
+    // System Data State representing Open Science deliverables, tasks and checklists
     let tasks = [
         // ================= STREAM 1: Open Science Strategy (OSS) =================
-        { id: '1', parentId: null, name: 'University Open Science Strategy (OSS)', start: '2026-09-01', end: '2027-09-30', progress: 65, color: 'blue', type: 'project', expanded: true },
-        { id: '1.1', parentId: '1', name: 'Draft / update strategy document', start: '2026-09-01', end: '2026-10-15', progress: 100, color: 'blue', type: 'task' },
-        { id: '1.2', parentId: '1', name: 'Present document on CM5', start: '2026-10-19', end: '2026-10-20', progress: 100, color: 'blue', type: 'milestone' },
-        { id: '1.3', parentId: '1', name: 'Secure validation & institutional approval', start: '2026-12-01', end: '2027-03-15', progress: 60, color: 'blue', type: 'task' },
-        { id: '1.4', parentId: '1', name: 'Present approved version on OCM', start: '2027-03-20', end: '2027-03-21', progress: 0, color: 'blue', type: 'milestone' },
-        { id: '1.5', parentId: '1', name: 'Pilot document / target groups feedback', start: '2027-03-22', end: '2027-09-15', progress: 0, color: 'blue', type: 'task' },
-        { id: '1.6', parentId: '1', name: 'Present impact on CC1', start: '2027-09-25', end: '2027-09-26', progress: 0, color: 'blue', type: 'milestone' },
-        { id: '1.7', parentId: '1', name: 'Upload final validated OSS to Google Drive', start: '2027-03-22', end: '2027-03-31', progress: 0, color: 'blue', type: 'task', isUpload: true, driveUrl: 'https://drive.google.com/drive/folders/1EYx2vPXtuRR9DON3qJivbjAhyjYjV9el?usp=sharing' },
+        { id: '1', parentId: null, name: 'University Open Science Strategy (OSS)', start: '2026-09-01', end: '2027-09-30', progress: 65, color: 'blue', type: 'project', expanded: true, todos: [] },
+        { 
+            id: '1.1', parentId: '1', name: 'Draft / update strategy document', start: '2026-09-01', end: '2026-10-15', progress: 100, color: 'blue', type: 'task',
+            todos: [
+                { id: 101, text: 'Consolidate input from working groups', completed: true },
+                { id: 102, text: 'Review international benchmark standards', completed: true },
+                { id: 103, text: 'Finalize initial 5-year Action Plan chapters', completed: true }
+            ]
+        },
+        { id: '1.2', parentId: '1', name: 'Present document on CM5', start: '2026-10-19', end: '2026-10-20', progress: 100, color: 'blue', type: 'milestone', todos: [] },
+        { 
+            id: '1.3', parentId: '1', name: 'Secure validation & institutional approval', start: '2026-12-01', end: '2027-03-15', progress: 33, color: 'blue', type: 'task',
+            todos: [
+                { id: 104, text: 'Submit draft to Academic Quality Senate board', completed: true },
+                { id: 105, text: 'Acquire official endorsement from steering committee', completed: false },
+                { id: 106, text: 'Incorporate final recommendations from rectorate board', completed: false }
+            ]
+        },
+        { id: '1.4', parentId: '1', name: 'Present approved version on OCM', start: '2027-03-20', end: '2027-03-21', progress: 0, color: 'blue', type: 'milestone', todos: [] },
+        { 
+            id: '1.5', parentId: '1', name: 'Pilot document / target groups feedback', start: '2027-03-22', end: '2027-09-15', progress: 0, color: 'blue', type: 'task',
+            todos: [
+                { id: 107, text: 'Establish digital feedback collection form', completed: false },
+                { id: 108, text: 'Run pilot workshops with pilot faculties', completed: false }
+            ]
+        },
+        { id: '1.6', parentId: '1', name: 'Present impact on CC1', start: '2027-09-25', end: '2027-09-26', progress: 0, color: 'blue', type: 'milestone', todos: [] },
+        { id: '1.7', parentId: '1', name: 'Upload final validated OSS to Google Drive', start: '2027-03-22', end: '2027-03-31', progress: 0, color: 'blue', type: 'task', isUpload: true, driveUrl: 'https://drive.google.com/drive/folders/1EYx2vPXtuRR9DON3qJivbjAhyjYjV9el?usp=sharing', todos: [] },
 
         // ================= STREAM 2: Institutional Open Access Policy (OAP) =================
-        { id: '2', parentId: null, name: 'Institutional Open Access Policy (OAP)', start: '2026-09-01', end: '2027-09-30', progress: 50, color: 'orange', type: 'project', expanded: true },
-        { id: '2.1', parentId: '2', name: 'Draft / update policy document', start: '2026-09-01', end: '2026-10-15', progress: 100, color: 'orange', type: 'task' },
-        { id: '2.2', parentId: '2', name: 'Present document on CM5', start: '2026-10-19', end: '2026-10-20', progress: 100, color: 'orange', type: 'milestone' },
-        { id: '2.3', parentId: '2', name: 'Secure validation & institutional approval', start: '2026-12-01', end: '2027-03-15', progress: 20, color: 'orange', type: 'task' },
-        { id: '2.4', parentId: '2', name: 'Present approved version on OCM', start: '2027-03-20', end: '2027-03-21', progress: 0, color: 'orange', type: 'milestone' },
-        { id: '2.5', parentId: '2', name: 'Pilot document / target groups feedback', start: '2027-03-22', end: '2027-09-15', progress: 0, color: 'orange', type: 'task' },
-        { id: '2.6', parentId: '2', name: 'Present impact on CC1', start: '2027-09-25', end: '2027-09-26', progress: 0, color: 'orange', type: 'milestone' },
-        { id: '2.7', parentId: '2', name: 'Upload final validated OAP to Google Drive', start: '2027-03-22', end: '2027-03-31', progress: 0, color: 'orange', type: 'task', isUpload: true, driveUrl: 'https://drive.google.com/drive/folders/1EYx2vPXtuRR9DON3qJivbjAhyjYjV9el?usp=sharing' },
+        { id: '2', parentId: null, name: 'Institutional Open Access Policy (OAP)', start: '2026-09-01', end: '2027-09-30', progress: 50, color: 'orange', type: 'project', expanded: true, todos: [] },
+        { 
+            id: '2.1', parentId: '2', name: 'Draft / update policy document', start: '2026-09-01', end: '2026-10-15', progress: 100, color: 'orange', type: 'task',
+            todos: [
+                { id: 201, text: 'Draft mandate requiring open licenses', completed: true },
+                { id: 202, text: 'Review institutional repository capabilities', completed: true }
+            ]
+        },
+        { id: '2.2', parentId: '2', name: 'Present document on CM5', start: '2026-10-19', end: '2026-10-20', progress: 100, color: 'orange', type: 'milestone', todos: [] },
+        { 
+            id: '2.3', parentId: '2', name: 'Secure validation & institutional approval', start: '2026-12-01', end: '2027-03-15', progress: 0, color: 'orange', type: 'task',
+            todos: [
+                { id: 203, text: 'Run library directorate evaluation roundtable', completed: false },
+                { id: 204, text: 'Pass faculty-level approval checks', completed: false }
+            ]
+        },
+        { id: '2.4', parentId: '2', name: 'Present approved version on OCM', start: '2027-03-20', end: '2027-03-21', progress: 0, color: 'orange', type: 'milestone', todos: [] },
+        { id: '2.5', parentId: '2', name: 'Pilot document / target groups feedback', start: '2027-03-22', end: '2027-09-15', progress: 0, color: 'orange', type: 'task', todos: [] },
+        { id: '2.6', parentId: '2', name: 'Present impact on CC1', start: '2027-09-25', end: '2027-09-26', progress: 0, color: 'orange', type: 'milestone', todos: [] },
+        { id: '2.7', parentId: '2', name: 'Upload final validated OAP to Google Drive', start: '2027-03-22', end: '2027-03-31', progress: 0, color: 'orange', type: 'task', isUpload: true, driveUrl: 'https://drive.google.com/drive/folders/1EYx2vPXtuRR9DON3qJivbjAhyjYjV9el?usp=sharing', todos: [] },
 
         // ================= STREAM 3: Data Management Plan (DMP) =================
-        { id: '3', parentId: null, name: 'Data Management Plan (DMP)', start: '2026-09-01', end: '2027-09-30', progress: 45, color: 'emerald', type: 'project', expanded: true },
-        { id: '3.1', parentId: '3', name: 'Draft the strategy document', start: '2026-09-01', end: '2026-10-15', progress: 100, color: 'emerald', type: 'task' },
-        { id: '3.2', parentId: '3', name: 'Present document on CM5', start: '2026-10-19', end: '2026-10-20', progress: 100, color: 'emerald', type: 'milestone' },
-        { id: '3.3', parentId: '3', name: 'Secure validation & institutional approval', start: '2026-12-01', end: '2027-03-15', progress: 10, color: 'emerald', type: 'task' },
-        { id: '3.4', parentId: '3', name: 'Present approved version on OCM', start: '2027-03-20', end: '2027-03-21', progress: 0, color: 'emerald', type: 'milestone' },
-        { id: '3.5', parentId: '3', name: 'Pilot document / target groups feedback', start: '2027-03-22', end: '2027-09-15', progress: 0, color: 'emerald', type: 'task' },
-        { id: '3.6', parentId: '3', name: 'Present impact on CC1', start: '2027-09-25', end: '2027-09-26', progress: 0, color: 'emerald', type: 'milestone' },
-        { id: '3.7', parentId: '3', name: 'Upload final validated DMP to Google Drive', start: '2027-03-22', end: '2027-03-31', progress: 0, color: 'emerald', type: 'task', isUpload: true, driveUrl: 'https://drive.google.com/drive/folders/1EYx2vPXtuRR9DON3qJivbjAhyjYjV9el?usp=sharing' },
+        { id: '3', parentId: null, name: 'Data Management Plan (DMP)', start: '2026-09-01', end: '2027-09-30', progress: 45, color: 'emerald', type: 'project', expanded: true, todos: [] },
+        { 
+            id: '3.1', parentId: '3', name: 'Draft the strategy document', start: '2026-09-01', end: '2026-10-15', progress: 100, color: 'emerald', type: 'task',
+            todos: [
+                { id: 301, text: 'Create DMP standard template format', completed: true },
+                { id: 302, text: 'Formulate research data storage recommendations', completed: true }
+            ]
+        },
+        { id: '3.2', parentId: '3', name: 'Present document on CM5', start: '2026-10-19', end: '2026-10-20', progress: 0, color: 'emerald', type: 'milestone', todos: [] },
+        { id: '3.3', parentId: '3', name: 'Secure validation & institutional approval', start: '2026-12-01', end: '2027-03-15', progress: 0, color: 'emerald', type: 'task', todos: [] },
+        { id: '3.4', parentId: '3', name: 'Present approved version on OCM', start: '2027-03-20', end: '2027-03-21', progress: 0, color: 'emerald', type: 'milestone', todos: [] },
+        { id: '3.5', parentId: '3', name: 'Pilot document / target groups feedback', start: '2027-03-22', end: '2027-09-15', progress: 0, color: 'emerald', type: 'task', todos: [] },
+        { id: '3.6', parentId: '3', name: 'Present impact on CC1', start: '2027-09-25', end: '2027-09-26', progress: 0, color: 'emerald', type: 'milestone', todos: [] },
+        { id: '3.7', parentId: '3', name: 'Upload final validated DMP to Google Drive', start: '2027-03-22', end: '2027-03-31', progress: 0, color: 'emerald', type: 'task', isUpload: true, driveUrl: 'https://drive.google.com/drive/folders/1EYx2vPXtuRR9DON3qJivbjAhyjYjV9el?usp=sharing', todos: [] },
 
         // ================= STREAM 4: OS-Recognition and Rewards Program =================
-        { id: '4', parentId: null, name: 'OS-Recognition & Rewards Programme', start: '2026-09-01', end: '2027-09-30', progress: 38, color: 'purple', type: 'project', expanded: true },
-        { id: '4.1', parentId: '4', name: 'Define recognized practices / reward structures', start: '2026-09-01', end: '2026-10-15', progress: 100, color: 'purple', type: 'task' },
-        { id: '4.2', parentId: '4', name: 'Present programme on CM5', start: '2026-10-19', end: '2026-10-20', progress: 100, color: 'purple', type: 'milestone' },
-        { id: '4.3', parentId: '4', name: 'Integrate into institutional systems', start: '2026-10-21', end: '2027-03-15', progress: 20, color: 'purple', type: 'task' },
-        { id: '4.4', parentId: '4', name: 'Secure validation & institutional approval', start: '2026-12-01', end: '2027-03-15', progress: 0, color: 'purple', type: 'task' },
-        { id: '4.5', parentId: '4', name: 'Present approved version on OCM', start: '2027-03-20', end: '2027-03-21', progress: 0, color: 'purple', type: 'milestone' },
-        { id: '4.6', parentId: '4', name: 'Pilot programme / target groups feedback', start: '2027-03-22', end: '2027-09-15', progress: 0, color: 'purple', type: 'task' },
-        { id: '4.7', parentId: '4', name: 'Present impact on CC1', start: '2027-09-25', end: '2027-09-26', progress: 0, color: 'purple', type: 'milestone' },
-        { id: '4.8', parentId: '4', name: 'Upload final Rewards Program to Google Drive', start: '2027-03-22', end: '2027-03-31', progress: 0, color: 'purple', type: 'task', isUpload: true, driveUrl: 'https://drive.google.com/drive/folders/1EYx2vPXtuRR9DON3qJivbjAhyjYjV9el?usp=sharing' }
+        { id: '4', parentId: null, name: 'OS-Recognition & Rewards Programme', start: '2026-09-01', end: '2027-09-30', progress: 38, color: 'purple', type: 'project', expanded: true, todos: [] },
+        { 
+            id: '4.1', parentId: '4', name: 'Define recognized practices / reward structures', start: '2026-09-01', end: '2026-10-15', progress: 100, color: 'purple', type: 'task',
+            todos: [
+                { id: 401, text: 'Identify metrics for OS monitoring', completed: true },
+                { id: 402, text: 'Draft types of promotional & direct rewards structures', completed: true }
+            ]
+        },
+        { id: '4.2', parentId: '4', name: 'Present programme on CM5', start: '2026-10-19', end: '2026-10-20', progress: 0, color: 'purple', type: 'milestone', todos: [] },
+        { id: '4.3', parentId: '4', name: 'Integrate into institutional systems', start: '2026-10-21', end: '2027-03-15', progress: 0, color: 'purple', type: 'task', todos: [] },
+        { id: '4.4', parentId: '4', name: 'Secure validation & institutional approval', start: '2026-12-01', end: '2027-03-15', progress: 0, color: 'purple', type: 'task', todos: [] },
+        { id: '4.5', parentId: '4', name: 'Present approved version on OCM', start: '2027-03-20', end: '2027-03-21', progress: 0, color: 'purple', type: 'milestone', todos: [] },
+        { id: '4.6', parentId: '4', name: 'Pilot programme / target groups feedback', start: '2027-03-22', end: '2027-09-15', progress: 0, color: 'purple', type: 'task', todos: [] },
+        { id: '4.7', parentId: '4', name: 'Present impact on CC1', start: '2027-09-25', end: '2027-09-26', progress: 0, color: 'purple', type: 'milestone', todos: [] },
+        { id: '4.8', parentId: '4', name: 'Upload final Rewards Program to Google Drive', start: '2027-03-22', end: '2027-03-31', progress: 0, color: 'purple', type: 'task', isUpload: true, driveUrl: 'https://drive.google.com/drive/folders/1EYx2vPXtuRR9DON3qJivbjAhyjYjV9el?usp=sharing', todos: [] }
     ];
 
     // Horizontal Scale Bounds (Start of Gantt: Sep 2026 | End of Gantt: Oct 2027)
@@ -310,13 +403,15 @@
     const totalDays = (timelineEnd - timelineStart) / (1000 * 60 * 60 * 24);
 
     let currentZoom = 'months'; // options: 'months', 'quarters'
+    let currentEditingTodos = []; // Tracks todos modified dynamically inside the open drawer
 
     // Color definitions
     const colorsMap = {
         blue: { primary: '#2563eb', bg: '#dbeafe', border: '#bfdbfe', text: '#1e40af' },
         orange: { primary: '#f97316', bg: '#ffedd5', border: '#fed7aa', text: '#9a3412' },
         emerald: { primary: '#10b981', bg: '#d1fae5', border: '#a7f3d0', text: '#065f46' },
-        purple: { primary: '#8b5cf6', bg: '#ede9fe', border: '#ddd6fe', text: '#5b21b6' }
+        purple: { primary: '#8b5cf6', bg: '#ede9fe', border: '#ddd6fe', text: '#5b21b6' },
+        completed: { primary: '#10b981', bg: '#d1fae5', border: '#a7f3d0', text: '#065f46' } // Milestone completed green style
     };
 
     const months = [
@@ -361,6 +456,16 @@
         renderGantt();
     }
 
+    // Direct Toggle Milestone Accomplished from Task Spreadsheet Row
+    function toggleMilestoneQuick(taskId, event) {
+        event.stopPropagation(); // prevent opening the full editing drawer
+        const task = tasks.find(t => t.id === taskId);
+        if (task && task.type === 'milestone') {
+            task.progress = task.progress === 100 ? 0 : 100;
+            renderGantt();
+        }
+    }
+
     // Set zoom scaling
     function setZoom(mode) {
         currentZoom = mode;
@@ -398,8 +503,8 @@
             const tr = document.createElement('div');
             tr.className = `flex items-center h-10 divide-x divide-slate-100 ${depthClass} cursor-pointer border-b border-slate-100 transition`;
             tr.onclick = (e) => {
-                // If clicked toggle icon, do not open drawer
-                if (e.target.closest('.toggle-icon-btn')) return;
+                // If clicked toggle icon or quick checkbox, do not open drawer
+                if (e.target.closest('.toggle-icon-btn') || e.target.closest('.quick-checkmark-btn')) return;
                 openDrawer(task.id);
             };
 
@@ -424,22 +529,42 @@
             let driveIndicator = '';
             if (task.isUpload) {
                 driveIndicator = `
-                    <span class="ml-1 text-orange-500 hover:text-orange-600" title="Regulatory Document Repository Upload target">
-                        <svg class="w-3.5 h-3.5 inline" fill="currentColor" viewBox="0 0 24 24">
+                    <span class="ml-1.5 text-orange-500 hover:text-orange-600 inline-block align-middle" title="Regulatory Document Repository Upload target">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" />
                         </svg>
                     </span>
                 `;
             }
 
-            // Milestone Diamond Icon
+            // Milestone Diamond Icon + Quick Checklist Action Button
             let iconMarkup = '';
+            let milestoneBtnMarkup = '';
             if (task.type === 'milestone') {
+                const isMilestoneCompleted = task.progress === 100;
+                const strokeColor = isMilestoneCompleted ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600';
+                
                 iconMarkup = `
-                    <span class="mr-2 text-slate-500" title="Milestone">
-                        <svg class="w-3 h-3 inline rotate-45" fill="currentColor" viewBox="0 0 24 24">
-                            <rect width="12" height="12" x="6" y="6" />
+                    <button onclick="toggleMilestoneQuick('${task.id}', event)" class="quick-checkmark-btn p-1 hover:bg-slate-100 rounded transition mr-1.5 text-slate-500" title="Click to quickly toggle Complete status">
+                        <svg class="w-4 h-4 ${strokeColor}" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            ${isMilestoneCompleted 
+                                ? '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />' 
+                                : '<circle cx="12" cy="12" r="9" />'}
                         </svg>
+                    </button>
+                `;
+            }
+
+            // Pending To-Do Badge count identifier
+            let todoBadgeHtml = '';
+            if (task.todos && task.todos.length > 0) {
+                const completedCount = task.todos.filter(t => t.completed).length;
+                const totalCount = task.todos.length;
+                const isAllCompleted = completedCount === totalCount;
+                
+                todoBadgeHtml = `
+                    <span class="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full inline-block ${isAllCompleted ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}" title="${totalCount - completedCount} sub-task checklist item(s) pending">
+                        ✓ ${completedCount}/${totalCount}
                     </span>
                 `;
             }
@@ -450,11 +575,12 @@
                     ${toggleHtml}
                     ${colorDot}
                     ${iconMarkup}
-                    <span class="truncate" title="${task.name}">${task.name}</span>
+                    <span class="truncate ${task.type === 'milestone' && task.progress === 100 ? 'text-emerald-700 font-semibold' : ''}" title="${task.name}">${task.name}</span>
                     ${driveIndicator}
+                    ${todoBadgeHtml}
                 </div>
                 <div class="w-20 text-center shrink-0 p-2 text-slate-500 font-medium">${formatDateShort(task.start)}</div>
-                <div class="w-20 text-center shrink-0 p-2 font-semibold ${task.progress === 100 ? 'text-emerald-600' : 'text-slate-500'}">${task.progress}%</div>
+                <div class="w-24 text-center shrink-0 p-2 font-semibold ${task.progress === 100 ? 'text-emerald-600' : 'text-slate-500'}">${task.progress}%</div>
             `;
             tableContainer.appendChild(tr);
         });
@@ -512,7 +638,9 @@
             if (leftPercent < 0) { leftPercent = 0; }
             if (leftPercent + widthPercent > 100) { widthPercent = 100 - leftPercent; }
 
-            const barPalette = colorsMap[task.color] || colorsMap.blue;
+            // Determine palette style. If milestone is complete, paint it emerald green!
+            const isMilestoneCompleted = task.type === 'milestone' && task.progress === 100;
+            const barPalette = isMilestoneCompleted ? colorsMap.completed : (colorsMap[task.color] || colorsMap.blue);
 
             if (task.type === 'milestone') {
                 // Milestones mapped as diamond shapes instead of spans
@@ -522,12 +650,15 @@
                 diamond.style.left = `calc(${milestoneCenterOffset}% - 7px)`;
                 diamond.onclick = () => openDrawer(task.id);
                 
+                const pulseClass = isMilestoneCompleted ? '' : 'milestone-pulse';
+                
                 diamond.innerHTML = `
-                    <div class="milestone-diamond border-2 shadow-sm transition-transform hover:scale-125" 
+                    <div class="milestone-diamond border-2 shadow-sm transition-transform hover:scale-125 ${pulseClass}" 
                          style="background-color: ${barPalette.primary}; border-color: ${barPalette.border}"></div>
                     <!-- Hover Tooltip -->
-                    <div class="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-900 text-white text-[10px] rounded py-1 px-2 whitespace-nowrap shadow-md z-30 font-semibold">
-                        ${task.name} (${formatDateShort(task.start)})
+                    <div class="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-900 text-white text-[10px] rounded py-1.5 px-2 whitespace-nowrap shadow-md z-30 font-semibold text-center">
+                        <div>${task.name}</div>
+                        <div class="text-[9px] text-slate-300 font-normal mt-0.5">${formatDateShort(task.start)} • ${isMilestoneCompleted ? 'COMPLETE' : 'PENDING'}</div>
                     </div>
                 `;
                 rowDiv.appendChild(diamond);
@@ -648,8 +779,38 @@
         document.getElementById('edit-name').value = task.name;
         document.getElementById('edit-start').value = task.start;
         document.getElementById('edit-end').value = task.end;
-        document.getElementById('edit-progress').value = task.progress;
-        document.getElementById('edit-progress-display').textContent = `${task.progress}%`;
+        
+        // Deep copy todos list for editing safely inside local state
+        currentEditingTodos = JSON.parse(JSON.stringify(task.todos || []));
+
+        // Setup Drawer elements conditional visibility (Milestone vs Normal Task)
+        const progressBlock = document.getElementById('standard-progress-block');
+        const milestoneBlock = document.getElementById('milestone-status-block');
+        const todoBlock = document.getElementById('todo-checklist-section');
+
+        if (task.type === 'milestone') {
+            progressBlock.classList.add('hidden');
+            todoBlock.classList.add('hidden');
+            milestoneBlock.classList.remove('hidden');
+            updateMilestoneDrawerUI(task.progress === 100);
+        } else {
+            progressBlock.classList.remove('hidden');
+            todoBlock.classList.remove('hidden');
+            milestoneBlock.classList.add('hidden');
+            
+            document.getElementById('edit-progress').value = task.progress;
+            document.getElementById('edit-progress-display').textContent = `${task.progress}%`;
+            
+            // Notice text toggling if task has items
+            const autoCalcNotice = document.getElementById('progress-auto-calc-notice');
+            if (currentEditingTodos.length > 0) {
+                autoCalcNotice.classList.remove('hidden');
+            } else {
+                autoCalcNotice.classList.add('hidden');
+            }
+
+            renderDrawerTodoList();
+        }
 
         // Style parameters
         document.getElementById('drawer-tag').textContent = task.type.toUpperCase();
@@ -678,12 +839,120 @@
         drawer.querySelector('.h-full').classList.add('translate-x-full');
     }
 
+    // Toggle Milestone state in Drawer
+    function toggleMilestoneAchievement() {
+        const isComplete = document.getElementById('toggle-milestone-complete-btn').textContent.trim() === 'Mark Complete';
+        updateMilestoneDrawerUI(isComplete);
+    }
+
+    function updateMilestoneDrawerUI(isComplete) {
+        const btn = document.getElementById('toggle-milestone-complete-btn');
+        const text = document.getElementById('milestone-status-text');
+        
+        if (isComplete) {
+            btn.textContent = 'Mark Pending';
+            btn.className = "bg-slate-700 hover:bg-slate-600 text-white font-bold px-4 py-2 rounded-lg text-xs transition";
+            text.textContent = 'Achieved & Completed (Green Diamond)';
+            text.className = "text-xs text-emerald-600 font-semibold";
+        } else {
+            btn.textContent = 'Mark Complete';
+            btn.className = "bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg text-xs transition";
+            text.textContent = 'Pending Action Target';
+            text.className = "text-xs text-slate-500";
+        }
+    }
+
+    // Update Slider manual override
+    function updateSliderProgress(val) {
+        document.getElementById('edit-progress-display').textContent = val + '%';
+    }
+
+    // Render local To-Do Checklist inside drawer
+    function renderDrawerTodoList() {
+        const list = document.getElementById('todo-items-list');
+        list.innerHTML = '';
+
+        const completedCount = currentEditingTodos.filter(t => t.completed).length;
+        const totalCount = currentEditingTodos.length;
+        document.getElementById('todo-completion-ratio').textContent = `${completedCount}/${totalCount} Complete`;
+
+        if (totalCount === 0) {
+            list.innerHTML = `<p class="text-xs text-slate-400 italic text-center py-4">No checklist items. Add one above to start tracking!</p>`;
+            return;
+        }
+
+        currentEditingTodos.forEach((todo, index) => {
+            const item = document.createElement('div');
+            item.className = "flex items-center justify-between p-2 bg-slate-50 border border-slate-100 rounded-lg hover:border-slate-200 transition";
+            item.innerHTML = `
+                <div class="flex items-center gap-2 min-w-0">
+                    <input type="checkbox" id="todo-ch-${index}" ${todo.completed ? 'checked' : ''} onchange="toggleTodoItem(${index}, this.checked)" class="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 border-slate-300">
+                    <label for="todo-ch-${index}" class="text-xs text-slate-700 truncate cursor-pointer ${todo.completed ? 'line-through text-slate-400' : ''}" title="${todo.text}">
+                        ${todo.text}
+                    </label>
+                </div>
+                <button onclick="removeTodoItem(${index})" class="text-slate-400 hover:text-red-500 transition p-1 rounded hover:bg-slate-200">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
+            `;
+            list.appendChild(item);
+        });
+    }
+
+    // Add list item
+    function addTodoItem() {
+        const input = document.getElementById('new-todo-text');
+        const text = input.value.trim();
+        if (!text) return;
+
+        currentEditingTodos.push({
+            id: Date.now(),
+            text: text,
+            completed: false
+        });
+
+        input.value = '';
+        autoUpdateProgressFromTodos();
+        renderDrawerTodoList();
+    }
+
+    // Toggle checklist checkbox state
+    function toggleTodoItem(index, isChecked) {
+        currentEditingTodos[index].completed = isChecked;
+        autoUpdateProgressFromTodos();
+        renderDrawerTodoList();
+    }
+
+    // Remove list item
+    function removeTodoItem(index) {
+        currentEditingTodos.splice(index, 1);
+        autoUpdateProgressFromTodos();
+        renderDrawerTodoList();
+    }
+
+    // Auto calculate progress percentage dynamically based on checking sub-tasks
+    function autoUpdateProgressFromTodos() {
+        if (currentEditingTodos.length > 0) {
+            const completed = currentEditingTodos.filter(t => t.completed).length;
+            const percentage = Math.round((completed / currentEditingTodos.length) * 100);
+            
+            // Sync slider value
+            document.getElementById('edit-progress').value = percentage;
+            document.getElementById('edit-progress-display').textContent = `${percentage}%`;
+            document.getElementById('progress-auto-calc-notice').classList.remove('hidden');
+        } else {
+            document.getElementById('progress-auto-calc-notice').classList.add('hidden');
+        }
+    }
+
     function toggleDriveComplete(isChecked) {
         document.getElementById('edit-progress').value = isChecked ? 100 : 0;
         document.getElementById('edit-progress-display').textContent = isChecked ? '100%' : '0%';
     }
 
-    // Save modifications from Drawer
+    // Save modifications from Drawer back to main Tasks state
     function saveTaskDetails() {
         const id = document.getElementById('edit-id').value;
         const task = tasks.find(t => t.id === id);
@@ -691,7 +960,14 @@
             task.name = document.getElementById('edit-name').value;
             task.start = document.getElementById('edit-start').value;
             task.end = document.getElementById('edit-end').value;
-            task.progress = parseInt(document.getElementById('edit-progress').value, 10);
+
+            if (task.type === 'milestone') {
+                const isComplete = document.getElementById('toggle-milestone-complete-btn').textContent.trim() === 'Mark Pending';
+                task.progress = isComplete ? 100 : 0;
+            } else {
+                task.progress = parseInt(document.getElementById('edit-progress').value, 10);
+                task.todos = currentEditingTodos; // persist the edited checklist
+            }
             
             // Check drive upload validation if task.isUpload
             if (task.isUpload && task.progress === 100) {
